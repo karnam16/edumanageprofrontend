@@ -102,15 +102,12 @@ const Fees = () => {
     setError(null);
 
     try {
-      // Update the fee record with payment information
-      const updatedFee = {
-        ...selectedFee,
-        status: "PAID",
+      // Use the dedicated mark-as-paid endpoint with payment data
+      await feeAPI.markFeeAsPaid(selectedFee.id, {
         paymentMethod: paymentData.paymentMethod,
         paymentDate: paymentData.paymentDate,
-      };
-
-      await feeAPI.updateFeeRecord(updatedFee);
+      });
+      
       await fetchData();
       setShowPaymentForm(false);
       resetForm();

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { studentAPI, feeAPI, testConnection } from "../services/api";
+import ConnectionStatus from "./ConnectionStatus";
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -20,72 +21,106 @@ const Dashboard = () => {
     try {
       // Test API connection first
       const connectionTest = await testConnection();
-      setApiStatus(connectionTest.success ? "✅ Connected" : "❌ Disconnected");
-
+      
       if (connectionTest.success) {
-        // Fetch all data in parallel
+        setApiStatus("✅ Connected");
+        
+        // Fetch all data in parallel with better error handling
         const [students, feeRecords] = await Promise.all([
-          studentAPI.getAllStudents(),
-          feeAPI.getAllFeeRecords(),
+          studentAPI.getAllStudents().catch(err => {
+            console.warn("Failed to fetch students:", err.message);
+            return [];
+          }),
+          feeAPI.getAllFeeRecords().catch(err => {
+            console.warn("Failed to fetch fees:", err.message);
+            return [];
+          }),
         ]);
 
-        setStudentCount(students.length);
+        // Ensure we have arrays to work with
+        const validStudents = Array.isArray(students) ? students : [];
+        const validFeeRecords = Array.isArray(feeRecords) ? feeRecords : [];
 
-        // Calculate financial metrics
-        const dueFeeRecords = feeRecords.filter((fee) => fee.status === "DUE");
-        const paidFeeRecords = feeRecords.filter(
-          (fee) => fee.status === "PAID"
-        );
-        const overdueFeeRecords = feeRecords.filter(
-          (fee) => fee.status === "OVERDUE"
-        );
+        setStudentCount(validStudents.length);
 
-        const totalDue = dueFeeRecords.reduce(
-          (sum, fee) => sum + (fee.amount || 0),
-          0
-        );
-        const totalPaid = paidFeeRecords.reduce(
-          (sum, fee) => sum + (fee.amount || 0),
-          0
-        );
+        // Calculate financial metrics with better safety checks
+        const dueFeeRecords = validFeeRecords.filter((fee) => fee.status === "DUE");
+        const paidFeeRecords = validFeeRecords.filter((fee) => fee.status === "PAID");
+        const overdueFeeRecords = validFeeRecords.filter((fee) => fee.status === "OVERDUE");
+
+        const totalDue = dueFeeRecords.reduce((sum, fee) => {
+          const amount = parseFloat(fee.amount) || 0;
+          return sum + amount;
+        }, 0);
+        
+        const totalPaid = paidFeeRecords.reduce((sum, fee) => {
+          const amount = parseFloat(fee.amount) || 0;
+          return sum + amount;
+        }, 0);
 
         setDueFees(totalDue);
         setTotalRevenue(totalPaid);
 
-        // Calculate this month's fees
+        // Calculate this month's fees with better date handling
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
 
         const thisMonthTotal = paidFeeRecords
           .filter((fee) => {
-            const feeDate = new Date(fee.paymentDate || fee.dueDate);
-            return (
-              feeDate.getMonth() === currentMonth &&
-              feeDate.getFullYear() === currentYear
-            );
+            try {
+              const feeDate = new Date(fee.paymentDate || fee.dueDate);
+              return (
+                !isNaN(feeDate.getTime()) &&
+                feeDate.getMonth() === currentMonth &&
+                feeDate.getFullYear() === currentYear
+              );
+            } catch (dateError) {
+              console.warn("Invalid date in fee record:", fee);
+              return false;
+            }
           })
-          .reduce((sum, fee) => sum + (fee.amount || 0), 0);
+          .reduce((sum, fee) => {
+            const amount = parseFloat(fee.amount) || 0;
+            return sum + amount;
+          }, 0);
 
         setThisMonthFees(thisMonthTotal);
 
-        // Get recent students (last 5)
-        const sortedStudents = students
-          .sort((a, b) => new Date(b.joinDate || 0) - new Date(a.joinDate || 0))
+        // Get recent students (last 5) with better sorting
+        const sortedStudents = validStudents
+          .filter(student => student.joinDate) // Only students with valid join dates
+          .sort((a, b) => {
+            const dateA = new Date(a.joinDate);
+            const dateB = new Date(b.joinDate);
+            return dateB.getTime() - dateA.getTime();
+          })
           .slice(0, 5);
         setRecentStudents(sortedStudents);
 
-        // Get recent payments (last 5)
+        // Get recent payments (last 5) with better sorting
         const sortedPayments = paidFeeRecords
-          .sort(
-            (a, b) =>
-              new Date(b.paymentDate || 0) - new Date(a.paymentDate || 0)
-          )
+          .filter(payment => payment.paymentDate) // Only payments with valid dates
+          .sort((a, b) => {
+            const dateA = new Date(a.paymentDate);
+            const dateB = new Date(b.paymentDate);
+            return dateB.getTime() - dateA.getTime();
+          })
           .slice(0, 5);
         setRecentPayments(sortedPayments);
+        
+      } else {
+        setApiStatus("❌ Disconnected");
+        setError(connectionTest.message);
+        
+        // Show helpful suggestions if available
+        if (connectionTest.suggestions && connectionTest.suggestions.length > 0) {
+          const suggestionText = connectionTest.suggestions.join("\n");
+          console.log("Connection troubleshooting suggestions:\n" + suggestionText);
+        }
       }
     } catch (err) {
       console.error("Dashboard data fetch error:", err);
-      setError(err.message);
+      setError(err.message || "Failed to load dashboard data");
       setApiStatus("❌ Error");
     } finally {
       setLoading(false);
@@ -163,6 +198,9 @@ const Dashboard = () => {
             <strong>⚠️ Connection Error:</strong> {error}
           </div>
         )}
+
+        {/* Connection Status Component */}
+        <ConnectionStatus />
       </div>
 
       {/* Key Metrics */}
