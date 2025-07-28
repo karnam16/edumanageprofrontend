@@ -1,0 +1,26 @@
+[
+  {
+    "id": "b26bccaf-5f14-4014-bbbc-900347f795eb",
+    "name": "John Doe",
+    "email": "john.doe@email.com",
+    "phone": "123-456-7890",
+    "grade": "10th Grade",
+    "parentName": "Jane Doe",
+    "parentPhone": "123-456-7891",
+    "address": "123 Main St, City, State",
+    "joinDate": "2024-01-15",
+    "status": "ACTIVE"
+  },
+  {
+    "id": "3ffc6007-e5c9-43a5-ab0e-1ce23cd419c2",
+    "name": "Alice Smith",
+    "email": "alice.smith@email.com",
+    "phone": "234-567-8901",
+    "grade": "9th Grade",
+    "parentName": "Bob Smith",
+    "parentPhone": "234-567-8902",
+    "address": "456 Oak Ave, City, State",
+    "joinDate": "2024-02-01",
+    "status": "ACTIVE"
+  }
+]
